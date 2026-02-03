@@ -82,6 +82,7 @@ if st.session_state.vectorstore_created:
     # Query input
     question = st.chat_input("Ask a question about your journals...")
     
+    # Handle the question
     if question:
         with st.chat_message("user"):
             st.write(question)
@@ -95,8 +96,9 @@ if st.session_state.vectorstore_created:
                     rag_chain = RAGChain(retriever)
                     response = rag_chain.query(question)
                     
-                    answer = response['result']
-                    sources = response.get('source_documents', [])
+                    # Updated to match new chain response format
+                    answer = response.get('answer', 'No answer generated')
+                    sources = response.get('context', [])
                     
                     st.write(answer)
                     
@@ -104,9 +106,10 @@ if st.session_state.vectorstore_created:
                         with st.expander("View Sources"):
                             for i, doc in enumerate(sources):
                                 st.markdown(f"**Source {i+1}:**")
-                                st.text(doc.page_content[:300] + "...")
+                                # Handle both Document objects and dicts
+                                content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
+                                st.text(content[:300] + "...")
                     
-                    # Save to chat history
                     st.session_state.chat_history.append({
                         "question": question,
                         "answer": answer,
@@ -114,7 +117,11 @@ if st.session_state.vectorstore_created:
                     })
                     
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                    error_msg = str(e)
+                    if "ExpiredToken" in error_msg or "InvalidToken" in error_msg:
+                        st.error("⚠️ AWS session has expired. Please refresh your credentials and reload the vector store.")
+                    else:
+                        st.error(f"Error: {error_msg}")
 else:
     st.info("👈 Please load or create the vector store from the sidebar to begin.")
     st.markdown("""

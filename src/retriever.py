@@ -13,4 +13,4 @@ class RetrieverService:
     
     def retrieve_documents(self, query):
         """Retrieve relevant documents for a query"""
-        return self.retriever.get_relevant_documents(query)
+        return self.retriever.invoke(query)

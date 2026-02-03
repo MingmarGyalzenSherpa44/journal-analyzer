@@ -1,7 +1,7 @@
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from src.llm import LLMService
-from src.retriever import RetrieverService
 
 class RAGChain:
     def __init__(self, retriever):
@@ -9,35 +9,46 @@ class RAGChain:
         self.llm = self.llm_service.get_llm()
         self.retriever = retriever
         
-        self.prompt_template = """You are an AI assistant analyzing personal journal entries. 
-        Use the following pieces of context from the journal entries to answer the question. 
-        If you don't know the answer based on the context, say so. Don't make up information.
-        Be empathetic and thoughtful in your responses.
+        # Use ChatPromptTemplate for chat models
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an AI assistant analyzing personal journal entries. 
+Use the following pieces of context from the journal entries to answer the question. 
+If you don't know the answer based on the context, say so. Don't make up information.
+Be empathetic and thoughtful in your responses.
 
-        Context: {context}
-
-        Question: {question}
-
-        Answer: """
-        
-        self.PROMPT = PromptTemplate(
-            template=self.prompt_template,
-            input_variables=["context", "question"]
-        )
+Context: {context}"""),
+            ("human", "{input}")
+        ])
+    
+    def format_docs(self, docs):
+        """Format retrieved documents into a single string"""
+        return "\n\n".join(doc.page_content for doc in docs)
     
     def create_chain(self):
-        """Create RAG chain"""
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.retriever,
-            return_source_documents=True,
-            chain_type_kwargs={"prompt": self.PROMPT}
+        """Create RAG chain using LCEL"""
+        # Build the chain using LangChain Expression Language
+        chain = (
+            {
+                "context": self.retriever | self.format_docs,
+                "input": RunnablePassthrough()
+            }
+            | self.prompt
+            | self.llm
+            | StrOutputParser()
         )
-        return qa_chain
+        return chain
     
     def query(self, question):
         """Query the RAG chain"""
         chain = self.create_chain()
-        response = chain.invoke({"query": question})
-        return response
+        
+        # Get the answer
+        answer = chain.invoke(question)
+        
+        source_docs = self.retriever.invoke(question) 
+        
+        return {
+            "answer": answer,
+            "context": source_docs,
+            "input": question
+        }

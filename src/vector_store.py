@@ -1,9 +1,9 @@
+import os
 from langchain_chroma import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader, DirectoryLoader
 from src.config import Config
 from src.embeddings import EmbeddingService
-import os
 
 class VectorStoreService:
     def __init__(self):
